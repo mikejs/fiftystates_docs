@@ -11,22 +11,22 @@ LegislationScraper
 ==================
 
 .. autoclass:: legislation.LegislationScraper
-   :members: __init__, urlopen, log, add_bill, add_legislator, scrape_bills, scrape_legislators, scrape_metadata
+   :members: __init__, urlopen, urlopen_context, soup_context, log, add_bill, add_legislator, scrape_bills, scrape_legislators, scrape_metadata
 
 Bill
 ====
 .. autoclass:: legislation.Bill
-   :members: __init__, add_action, add_sponsor, add_version, add_vote
+   :members: __init__, add_action, add_sponsor, add_version, add_vote, add_document, add_source
 
 Vote
 ====
 .. autoclass:: legislation.Vote
-   :members: __init__, yes, no, other
+   :members: __init__, yes, no, other, add_source
 
 Legislator
 ==========
 .. autoclass:: legislation.Legislator
-   :members: __init__
+   :members: __init__, add_source, add_role
 
 Exceptions
 ==========

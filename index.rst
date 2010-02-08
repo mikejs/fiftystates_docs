@@ -10,7 +10,7 @@ The Fifty State Project collects and makes available data about state legislativ
 a :doc:`RESTful API <api>` and through upcoming data dumps. To make working with the API easier, a :doc:`Python client library <client>` is available.
 
 Because most states do not make their legislative data publicly available in structured formats, we need
-to write scrapers to parse information from their publicly-facing websites. This is a large task and one we can always use help on. The below map gives a rough idea of our current status: green states have data available (or will very shortly), while we are still looking fo :doc:`help <contributing>` filling in grey states.
+to write scrapers to parse information from their publicly-facing websites. This is a large task and one we can always use help on. The below map gives a rough idea of our current status: green states have data available (or will very shortly), while we are still looking for :doc:`help <contributing>` filling in grey states.
 
 .. image:: status.png
    :width: 50 %

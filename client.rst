@@ -69,6 +69,15 @@ Lookup legislators by name and party:
     Eng, Mike
     Feuer, Mike
 
+Search bills:
+
+    >>> bills = fiftystates.Bill.search('agriculture', state='vt')[0:3]
+    >>> for bill in bills:
+    ...     print "%s %s %s" % (bill.state, bill.bill_id, bill.title)
+    vt H.0193 AN ACT RELATING TO THE ADDITION OF THE SECRETARY OF AGRICULTURE, FOOD AND MARKETS TO THE BOARD OF TRUSTEES OF THE UNIVERSITY OF VERMONT AND STATE AGRICULTURAL COLLEGE
+    vt S.0132 AN ACT RELATING TO AGRICULTURAL FUNDING EDUCATION AND OUTREACH
+    vt H.0429 AN ACT RELATING TO A TUITION CREDIT FOR STUDENTS IN AGRICULTURAL PROGRAMS
+
 Grab information about a specific bill:
 
     >>> bill = fiftystates.Bill.get('ca', '20092010', 'lower', 'AB20')

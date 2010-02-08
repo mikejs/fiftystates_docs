@@ -5,14 +5,14 @@ Fifty State Project API
 
 .. contents::
    :local:
-   
+
 Basic Information
 =================
 
 The Fifty State Project provides a RESTful API for accessing state legislative information.
 
-* The base URL is ``http://174.129.25.59/api/``. 
-* All methods take an optional ``?format=(xml|json)`` parameter: JSON is the default if none is specified. 
+* The base URL is ``http://fiftystates-dev.sunlightlabs.com/api/``.
+* All methods take an optional ``?format=(xml|json)`` parameter: JSON is the default if none is specified.
 * Appropriate HTTP error codes are sent on errors.
 * An API key is not currently required, but may be in the future.
 * There is a :doc:`Python client library <client>`
@@ -29,11 +29,11 @@ Grab metadata about a certain state.
 
 URL format::
 
-	http://174.129.25.59/api/:STATE-ABBREV:/
+	http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/
 
 Example::
 
-	http://174.129.25.59/api/ca/?format=json
+	http://fiftystates-dev.sunlightlabs.com/api/ca/?format=json
 
 The response will be an object including at least the following fields:
 
@@ -52,61 +52,7 @@ The response will be an object including at least the following fields:
 	* ``end_year``: The year in which this session ended.
 	* ``name``: The name of this session.
 
-.. _leg-search:
-	
-Legislator Search
------------------
-
-Searches for legislators matching certain criteria. Search paramaters can include any combination
-of:
-
-* ``state``: Filter by state served in (two-letter state abbreviation)
-* ``first_name``, ``last_name``, ``middle_name``: Filter by name
-* ``party``: Filter by the legislator's party, e.g. 'Democrat' or 'Republican'.
-* ``session``: Filter by legislators who served during a certain session
-* ``district``: Filter by legislative district
-
-URL format::
-
-	http://174.129.25.59/api/legislators/search/?SEARCH-PARAMS
-	
-Example::
-
-	http://174.129.25.59/api/legislators/search/?state=ca&party=democrat&first_name=Bob&format=json
-
-Result will be a list of objects, each containing at least the following fields:
-
-* ``leg_id``: A permanent, unique identifier for this legislator within the Fifty State Project system.
-* ``full_name``
-* ``first_name`` 
-* ``last_name`` 
-* ``middle_name``
-* ``suffix``
-* ``party``
-* ``roles``: A list of objects representing roles this legislator has served in. Each object will contain at least the following fields: 
-	* ``state``
-	* ``session``
-	* ``chamber``
-	* ``district``
-	
-.. _leg-lookup:	
-
-Legislator Lookup
------------------
-
-If you have the Fifty State Project ``leg_id`` for a specific legislator, you can lookup more information
-using this call.
-
-URL Format::
-
-	http://174.129.25.59/api/legislators/:LEG_ID:/
-	
-Example::
-
-	http://174.129.25.59/api/legislators/105/?format=json
-	
-This will return a single object (or an HTTP error if the ID is invalid) with the same fields as
-are returned by :ref:`legislator search <leg-search>`.
+.. _bill-lookup:
 
 Bill Lookup
 -----------
@@ -115,12 +61,12 @@ Get information about a specific bill.
 
 URL Format::
 
-	http://174.129.25.59/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/bills/:BILL-ID:/
-	
+	http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/bills/:BILL-ID:/
+
 Example::
 
-	http://174.129.25.59/api/ca/20092010/lower/bills/AB667/?format=json
-	
+	http://fiftystates-dev.sunlightlabs.com/api/ca/20092010/lower/bills/AB667/?format=json
+
 Response will be an object with the following fields:
 
 * ``title``: The title given to the bill by the state legislature
@@ -139,7 +85,7 @@ Response will be an object with the following fields:
 	* ``leg_id``: A Fifty State Project legislator ID (see :ref:`legislator lookup <leg-lookup>`)
 	* ``full_name``: The name of the sponsor
 	* ``type``: The type of sponsorship (state specific, examples include 'Primary Sponsor', 'Co-Sponsor')
-	
+
 * ``votes``: A list of votes relating to this bill. Individual roll call results are not included inline, see :ref:`vote lookup <vote-lookup>` if you would like that data. Each vote will be an object with at least the following fields:
 
 	* ``vote_id``: A permanent, unique identifier for this vote that can be used to grab more information.
@@ -148,14 +94,91 @@ Response will be an object with the following fields:
 	* ``motion``: The motion being voted on
 	* ``yes_count``, ``no_count``, ``other_count``: The number of 'yes', 'no', and other votes
 	* ``passed``: Whether or not the vote passed
-	
+
 * ``versions``: A list of versions of the text of this bill. Each version will be an object with at least the following fields:
 
 	* ``url``: The URL for an official source of this version of the bill text
 	* ``name``: A name for this version of the bill text
-	
+
+Bill Search
+-----------
+
+Search bills by keywords.
+
+URL Format::
+
+    http://fiftystates-dev.sunlightlabs.com/api/bills/search/?:SEARCH-PARAMS:
+
+Example::
+
+    http://fiftystates-dev.sunlightlabs.com/api/bills/search/?q=agriculture&state=vt&format=json
+
+Possible search parameters include:
+
+* ``q`` (required): the keyword string to lookup
+* ``state`` (optional): filter results by given state (two-letter abbreviation)
+* ``session`` (optional): filter results by given session
+* ``chamber`` (optional): filter results by given chamber ('upper' or 'lower')
+
+Returns a list of bills containing the same fields returned by  :ref:`bill lookup <bill-lookup>`. Will only return the first 20 matching bills. If no bills match, a blank list is returned.
+
+.. _leg-lookup:
+
+Legislator Lookup
+-----------------
+
+If you have the Fifty State Project ``leg_id`` for a specific legislator, you can lookup more information
+using this call.
+
+URL Format::
+
+	http://fiftystates-dev.sunlightlabs.com/api/legislators/:LEG_ID:/
+
+Example::
+
+	http://fiftystates-dev.sunlightlabs.com/api/legislators/105/?format=json
+
+This will return a single object (or an HTTP error if the ID is invalid) with at least the following fields:
+
+* ``leg_id``: A permanent, unique identifier for this legislator within the Fifty State Project system.
+* ``full_name``
+* ``first_name``
+* ``last_name``
+* ``middle_name``
+* ``suffix``
+* ``party``
+* ``roles``: A list of objects representing roles this legislator has served in. Each object will contain at least the following fields:
+	* ``state``
+	* ``session``
+	* ``chamber``
+	* ``district``
+
+.. _leg-search:
+
+Legislator Search
+-----------------
+
+Searches for legislators matching certain criteria. Search paramaters can include any combination
+of:
+
+* ``state``: Filter by state served in (two-letter state abbreviation)
+* ``first_name``, ``last_name``, ``middle_name``: Filter by name
+* ``party``: Filter by the legislator's party, e.g. 'Democrat' or 'Republican'.
+* ``session``: Filter by legislators who served during a certain session
+* ``district``: Filter by legislative district
+
+URL format::
+
+	http://fiftystates-dev.sunlightlabs.com/api/legislators/search/?SEARCH-PARAMS
+
+Example::
+
+	http://fiftystates-dev.sunlightlabs.com/api/legislators/search/?state=ca&party=democrat&first_name=Bob&format=json
+
+Result will be a list of objects, each containing the same fields returned by :ref:`legislator lookup <leg-lookup>`. If no matching legislators are found, will return an empty list.
+
 .. _vote-lookup:
-	
+
 Vote Lookup
 -----------
 
@@ -163,12 +186,12 @@ If you have the Fifty State Project ``vote_id`` of a specific vote, you can look
 
 URL Format::
 
-	http://174.129.25.59/api/votes/:VOTE-ID:/
-	
+	http://fiftystates-dev.sunlightlabs.com/api/votes/:VOTE-ID:/
+
 Example::
 
-	http://174.129.25.59/api/votes/105/?format=json
-	
+	http://fiftystates-dev.sunlightlabs.com/api/votes/105/?format=json
+
 Response will be a single object with at least the following fields:
 
 * ``vote_id``: A permanent, unique identifier for this vote that can be used to grab more information.
@@ -182,21 +205,21 @@ Response will be a single object with at least the following fields:
 	* ``leg_id``: The Fifty State Project legislator ID of a voting legislator.
 	* ``full_name``: The name of the legislator
 	* ``type``: The way the legislator voted, e.g. 'yes', 'no', 'absent', 'other'
-	
+
 District Lookup
 ---------------
 
 Districts can be looked up by name or by latitude&longitude.
 
 URL Formats::
-   
-   http://174.129.25.59/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/districts/:DISTRICT-NAME:/
-   http://174.129.25.59/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/districts/geo/?lat=:LATITUDE:&long=:LONGITUDE:
+
+   http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/districts/:DISTRICT-NAME:/
+   http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/districts/geo/?lat=:LATITUDE:&long=:LONGITUDE:
 
 Examples::
 
-   http://174.129.25.59/api/ny/2009-2010/upper/district/106/?format=json
-   http://174.129.25.59/api/ny/2009-2010/upper/districts/geo/?lat=-73.675451&long=42.737498&format=json   
+   http://fiftystates-dev.sunlightlabs.com/api/ny/2009-2010/upper/districts/10/?format=json
+   http://fiftystates-dev.sunlightlabs.com/api/ny/2009-2010/upper/districts/geo/?lat=-73.675451&long=42.737498&format=json
 
 Response will be a single object with at least the following fields:
 
