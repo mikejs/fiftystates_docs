@@ -33,7 +33,7 @@ URL format::
 
 Example::
 
-	http://fiftystates-dev.sunlightlabs.com/api/ca/?format=json
+	http://fiftystates-dev.sunlightlabs.com/api/ca/
 
 The response will be an object including at least the following fields:
 
@@ -65,7 +65,7 @@ URL Format::
 
 Example::
 
-	http://fiftystates-dev.sunlightlabs.com/api/ca/20092010/lower/bills/AB667/?format=json
+	http://fiftystates-dev.sunlightlabs.com/api/ca/20092010/lower/bills/AB667/
 
 Response will be an object with the following fields:
 
@@ -111,7 +111,7 @@ URL Format::
 
 Example::
 
-    http://fiftystates-dev.sunlightlabs.com/api/bills/search/?q=agriculture&state=vt&format=json
+    http://fiftystates-dev.sunlightlabs.com/api/bills/search/?q=agriculture&state=vt
 
 Possible search parameters include:
 
@@ -119,9 +119,29 @@ Possible search parameters include:
 * ``state`` (optional): filter results by given state (two-letter abbreviation)
 * ``session`` (optional): filter results by given session
 * ``chamber`` (optional): filter results by given chamber ('upper' or 'lower')
+* ``updated_since`` (optional): only return bills that have been
+  updated since a given date, YYYY-MM-DD format
 
 Returns a list of bills containing the same fields returned by  :ref:`bill lookup <bill-lookup>`. Will only return the first 20 matching bills. If no bills match, a blank list is returned.
 
+Latest Bills
+------------
+
+Get bills updated since a certain time
+
+URL Format::
+
+    http://fiftystates-dev.sunlightlabs.com/api/bills/latest/?updated_since=:TIMESTAMP:&state=:STATE-ABBREV:
+
+Example::
+
+    http://fiftystates-dev.sunlightlabs.com/api/bills/latest/?updated_since=2010-04-01&state=sd
+
+Required parameters:
+
+* ``updated_since``: how far back to search, in YYYY-MM-DD format
+* ``state``: the state to search (two-letter abbreviation)
+    
 .. _leg-lookup:
 
 Legislator Lookup
@@ -136,7 +156,7 @@ URL Format::
 
 Example::
 
-	http://fiftystates-dev.sunlightlabs.com/api/legislators/105/?format=json
+	http://fiftystates-dev.sunlightlabs.com/api/legislators/105/
 
 This will return a single object (or an HTTP error if the ID is invalid) with at least the following fields:
 
@@ -173,7 +193,7 @@ URL format::
 
 Example::
 
-	http://fiftystates-dev.sunlightlabs.com/api/legislators/search/?state=ca&party=democrat&first_name=Bob&format=json
+	http://fiftystates-dev.sunlightlabs.com/api/legislators/search/?state=ca&party=democrat&first_name=Bob
 
 Result will be a list of objects, each containing the same fields returned by :ref:`legislator lookup <leg-lookup>`. If no matching legislators are found, will return an empty list.
 
@@ -190,7 +210,7 @@ URL Format::
 
 Example::
 
-	http://fiftystates-dev.sunlightlabs.com/api/votes/105/?format=json
+	http://fiftystates-dev.sunlightlabs.com/api/votes/105/
 
 Response will be a single object with at least the following fields:
 
@@ -209,7 +229,7 @@ Response will be a single object with at least the following fields:
 District Lookup
 ---------------
 
-Districts can be looked up by name or by latitude&longitude.
+Districts can be looked up by name or by latitude & longitude.
 
 URL Formats::
 
@@ -218,8 +238,8 @@ URL Formats::
 
 Examples::
 
-   http://fiftystates-dev.sunlightlabs.com/api/ny/2009-2010/upper/districts/10/?format=json
-   http://fiftystates-dev.sunlightlabs.com/api/ny/2009-2010/upper/districts/geo/?lat=-73.675451&long=42.737498&format=json
+   http://fiftystates-dev.sunlightlabs.com/api/ny/2009-2010/upper/districts/10/
+   http://fiftystates-dev.sunlightlabs.com/api/ny/2009-2010/upper/districts/geo/?lat=-73.675451&long=42.737498
 
 Response will be a single object with at least the following fields:
 
