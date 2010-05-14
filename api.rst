@@ -14,7 +14,7 @@ The Fifty State Project provides a RESTful API for accessing state legislative i
 * The base URL is ``http://fiftystates-dev.sunlightlabs.com/api/``.
 * All methods take an optional ``?format=(xml|json)`` parameter: JSON is the default if none is specified.
 * Appropriate HTTP error codes are sent on errors.
-* An API key is not currently required, but may be in the future.
+* An API key is required and can be obtained `here <http://services.sunlightlabs.com/>`_
 * There is a :doc:`Python client library <client>`
 
 Methods
@@ -29,11 +29,11 @@ Grab metadata about a certain state.
 
 URL format::
 
-	http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/
+	http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/?apikey=YOUR_API_KEY
 
 Example::
 
-	http://fiftystates-dev.sunlightlabs.com/api/ca/
+	http://fiftystates-dev.sunlightlabs.com/api/ca/?apikey=YOUR_API_KEY
 
 The response will be an object including at least the following fields:
 
@@ -61,11 +61,11 @@ Get information about a specific bill.
 
 URL Format::
 
-	http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/bills/:BILL-ID:/
+	http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/bills/:BILL-ID:/?apikey=YOUR_API_KEY
 
 Example::
 
-	http://fiftystates-dev.sunlightlabs.com/api/ca/20092010/lower/bills/AB667/
+	http://fiftystates-dev.sunlightlabs.com/api/ca/20092010/lower/bills/AB667/?apikey=YOUR_API_KEY
 
 Response will be an object with the following fields:
 
@@ -107,11 +107,11 @@ Search bills by keywords.
 
 URL Format::
 
-    http://fiftystates-dev.sunlightlabs.com/api/bills/search/?:SEARCH-PARAMS:
+    http://fiftystates-dev.sunlightlabs.com/api/bills/search/?:SEARCH-PARAMS:&apikey=YOUR_API_KEY
 
 Example::
 
-    http://fiftystates-dev.sunlightlabs.com/api/bills/search/?q=agriculture&state=vt
+    http://fiftystates-dev.sunlightlabs.com/api/bills/search/?q=agriculture&state=vt&apikey=YOUR_API_KEY
 
 Possible search parameters include:
 
@@ -131,11 +131,11 @@ Get bills updated since a certain time
 
 URL Format::
 
-    http://fiftystates-dev.sunlightlabs.com/api/bills/latest/?updated_since=:TIMESTAMP:&state=:STATE-ABBREV:
+    http://fiftystates-dev.sunlightlabs.com/api/bills/latest/?updated_since=:TIMESTAMP:&state=:STATE-ABBREV:&apikey=YOUR_API_KEY
 
 Example::
 
-    http://fiftystates-dev.sunlightlabs.com/api/bills/latest/?updated_since=2010-04-01&state=sd
+    http://fiftystates-dev.sunlightlabs.com/api/bills/latest/?updated_since=2010-04-01&state=sd&apikey=YOUR_API_KEY
 
 Required parameters:
 
@@ -152,11 +152,11 @@ using this call.
 
 URL Format::
 
-	http://fiftystates-dev.sunlightlabs.com/api/legislators/:LEG_ID:/
+	http://fiftystates-dev.sunlightlabs.com/api/legislators/:LEG_ID:/?apikey=YOUR_API_KEY
 
 Example::
 
-	http://fiftystates-dev.sunlightlabs.com/api/legislators/105/
+	http://fiftystates-dev.sunlightlabs.com/api/legislators/105/?apikey=YOUR_API_KEY
 
 This will return a single object (or an HTTP error if the ID is invalid) with at least the following fields:
 
@@ -189,11 +189,11 @@ of:
 
 URL format::
 
-	http://fiftystates-dev.sunlightlabs.com/api/legislators/search/?SEARCH-PARAMS
+	http://fiftystates-dev.sunlightlabs.com/api/legislators/search/?:SEARCH-PARAMS:&apikey=YOUR_API_KEY
 
 Example::
 
-	http://fiftystates-dev.sunlightlabs.com/api/legislators/search/?state=ca&party=democrat&first_name=Bob
+	http://fiftystates-dev.sunlightlabs.com/api/legislators/search/?state=ca&party=democrat&first_name=Bob&apikey=YOUR_API_KEY
 
 Result will be a list of objects, each containing the same fields returned by :ref:`legislator lookup <leg-lookup>`. If no matching legislators are found, will return an empty list.
 
@@ -206,11 +206,11 @@ If you have the Fifty State Project ``vote_id`` of a specific vote, you can look
 
 URL Format::
 
-	http://fiftystates-dev.sunlightlabs.com/api/votes/:VOTE-ID:/
+	http://fiftystates-dev.sunlightlabs.com/api/votes/:VOTE-ID:/?apikey=YOUR_API_KEY
 
 Example::
 
-	http://fiftystates-dev.sunlightlabs.com/api/votes/105/
+	http://fiftystates-dev.sunlightlabs.com/api/votes/105/?apikey=YOUR_API_KEY
 
 Response will be a single object with at least the following fields:
 
@@ -233,13 +233,13 @@ Districts can be looked up by name or by latitude & longitude.
 
 URL Formats::
 
-   http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/districts/:DISTRICT-NAME:/
-   http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/districts/geo/?lat=:LATITUDE:&long=:LONGITUDE:
+   http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/districts/:DISTRICT-NAME:/?apikey=YOUR_API_KEY
+   http://fiftystates-dev.sunlightlabs.com/api/:STATE-ABBREV:/:SESSION:/:CHAMBER:/districts/geo/?lat=:LATITUDE:&long=:LONGITUDE:&apikey=YOUR_API_KEY
 
 Examples::
 
-   http://fiftystates-dev.sunlightlabs.com/api/ny/2009-2010/upper/districts/10/
-   http://fiftystates-dev.sunlightlabs.com/api/ny/2009-2010/upper/districts/geo/?lat=-73.675451&long=42.737498
+   http://fiftystates-dev.sunlightlabs.com/api/ny/2009-2010/upper/districts/10/?apikey=YOUR_API_KEY
+   http://fiftystates-dev.sunlightlabs.com/api/ny/2009-2010/upper/districts/geo/?lat=-73.675451&long=42.73749&apikey=YOUR_API_KEY
 
 Response will be a single object with at least the following fields:
 
