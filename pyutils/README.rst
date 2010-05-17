@@ -4,29 +4,32 @@
 Python Scraper API
 ==================
 
-.. contents::
-   :local:
-
 LegislationScraper
 ==================
 
 .. autoclass:: legislation.LegislationScraper
-   :members: __init__, urlopen, urlopen_context, soup_context, log, add_bill, add_legislator, scrape_bills, scrape_legislators, scrape_metadata
+   :members: __init__, urlopen, log, save_bill, save_legislator, scrape_bills, scrape_legislators, scrape_metadata, save_person, urlopen, urlopen_context, lxml_context, run
 
 Bill
 ====
 .. autoclass:: legislation.Bill
-   :members: __init__, add_action, add_sponsor, add_version, add_vote, add_document, add_source
+   :members: __init__, add_action, add_sponsor, add_version, add_vote,
+             add_source
 
 Vote
 ====
 .. autoclass:: legislation.Vote
    :members: __init__, yes, no, other, add_source
 
+Person
+======
+.. autoclass:: legislation.Person
+   :members: __init__, add_role
+
 Legislator
 ==========
 .. autoclass:: legislation.Legislator
-   :members: __init__, add_source, add_role
+   :members: __init__, add_source
 
 Exceptions
 ==========

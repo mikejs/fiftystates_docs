@@ -5,12 +5,35 @@ import time
 import os
 import sys
 import urllib2
+import urlparse
 import random
-from hashlib import md5
-import cookielib
 import contextlib
 import logging
-from BeautifulSoup import BeautifulSoup
+import warnings
+from names import NameMatcher
+
+try:
+    from BeautifulSoup import BeautifulSoup
+    USE_SOUP = True
+except ImportError:
+    print "BeautifulSoup not found, LegislationScraper.soup_context will " \
+        "be unavailable"
+    USE_SOUP = False
+
+try:
+    import lxml.html
+    USE_LXML = True
+except ImportError:
+    print "lxml not found, LegislationScraper.lxml_context will " \
+        "be unavailable"
+    USE_LXML = False
+
+try:
+    import httplib2
+    USE_HTTPLIB2 = True
+except ImportError:
+    print "httplib2 not found, falling back to urllib2"
+    USE_HTTPLIB2 = False
 
 try:
     import json
@@ -51,8 +74,9 @@ class DateEncoder(json.JSONEncoder):
 class LegislationScraper(object):
     """Subclass for each state's scraper
 
-    Subclasses must define :meth:`scrape_bills` and the attribute
-    `state`
+    Subclasses should define :meth:`scrape_bills`,
+    :meth:`scrape_legislators`, and :attr:`metadata` and
+    :attr:`state` attributes.
 
     Put this at the top of your scripts::
 
@@ -69,6 +93,8 @@ class LegislationScraper(object):
                     default=False, help='scrape upper chamber'),
         make_option('--lower', action='store_true', dest='lower',
                     default=False, help='scrape lower chamber'),
+        make_option('--nolegislators', action='store_false', dest='legislators',
+                    default=True, help="don't scrape legislator data"),
         make_option('-v', '--verbose', action='count', dest='verbose',
                     default=False,
                     help="be verbose (use multiple times for more"\
@@ -83,8 +109,8 @@ class LegislationScraper(object):
 
     metadata = {}
 
-    # The earliest year for when legislative data is available:
-    # (Used for --all)
+    # The earliest year for which legislative data is available in
+    # any state (used for --all)
     earliest_year = 1969
 
     # The user agent used for requests (this will show up in the
@@ -93,9 +119,18 @@ class LegislationScraper(object):
 
     def __init__(self, verbosity=logging.INFO, sleep=False,
                  no_cache=False, output_dir=None, **kwargs):
+        """
+        Create a new LegislationScraper instance.
+
+        :param verbosity: minimum level of messages to log (from the
+          Python standard library's :mod:`logging` module)
+        :param sleep: if True, will insert random sleeps between attempts
+          to download pages
+        :param no_cache: if True, will ignore any cached downloads
+        :param output_dir: the Fifty State data directory to use
+        """
         if not hasattr(self, 'state'):
             raise Exception('LegislationScrapers must have a state attribute')
-        self._cookie_jar = cookielib.CookieJar()
 
         self.reset_name_matchers()
 
@@ -116,6 +151,13 @@ class LegislationScraper(object):
         self.logger.addHandler(console)
         self.logger.setLevel(verbosity)
 
+        if USE_HTTPLIB2:
+            if self.no_cache:
+                self.http = httplib2.Http()
+            else:
+                self.http = httplib2.Http(self.cache_dir)
+            self.http.follow_redirects = True
+
         # Convenience methods
         self.log = self.logger.info
         self.debug = self.logger.debug
@@ -123,16 +165,9 @@ class LegislationScraper(object):
 
     def urlopen(self, url):
         """
-        Grabs a URL, returning a cached version if available.
+        Grabs a URL, returning a cached version if available and
+        sleeping if necessary.
         """
-
-        if not self.no_cache:
-            url_cache = os.path.join(self.cache_dir,
-                                     md5(url).hexdigest() + '.html')
-            if os.path.exists(url_cache):
-                self.debug('Getting %s from cache' % url)
-                return open(url_cache).read()
-
         if self.sleep:
             # insert a short random delay before each request
             # and a longer random delay after some requests
@@ -148,21 +183,38 @@ class LegislationScraper(object):
 
             time.sleep(len)
 
-        self.log('Retrieving URL: %s' % url)
-        req = urllib2.Request(url, headers=self._make_headers())
-        self._cookie_jar.add_cookie_header(req)
-        try:
-            resp = urllib2.urlopen(req)
-        except:
-            self.logger.exception('Error fetching page: %s' % url)
-            raise
-        self._cookie_jar.extract_cookies(resp, req)
-        data = resp.read()
+        parsed = urlparse.urlparse(url)
+        if parsed.scheme in ['http', 'https'] and USE_HTTPLIB2:
+            try:
+                resp, content = self.http.request(
+                    url, "GET", headers=self._make_headers())
 
-        if not self.no_cache:
-            open(url_cache, 'w').write(data)
+                # raise a urllib2.HTTPError so underlying code can rely on it
+                if resp.status >= 400:
+                    raise urllib2.HTTPError(url, resp.status, resp.reason,
+                                            resp.items, None)
+            except:
+                self.logger.exception('Error fetching page: %s' % url)
+                raise
 
-        return data
+            if resp.fromcache:
+                self.log("Got %s (httplib2, cached)" % url)
+            else:
+                self.log("Got %s (httplib2)" % url)
+
+            return content
+        else:
+            # Use urllib2 for non-http requests (e.g. ftp)
+            req = urllib2.Request(url, headers=self._make_headers())
+            try:
+                resp = urllib2.urlopen(req)
+            except:
+                self.logger.exception("Error fetching page: %s" % url)
+                raise
+
+            self.log("Got %s (urllib2)" % url)
+
+            return resp.read()
 
     def show_error(self, url, body):
         exception = sys.exc_info()[1]
@@ -183,14 +235,14 @@ class LegislationScraper(object):
     @contextlib.contextmanager
     def urlopen_context(self, url):
         """
-        Use like::
+        Use like: ::
 
-            from __future__ import with_statement
+           from __future__ import with_statement
 
-            class State(LegislationScraper):
-                def something(self):
-                    with self.urlopen_context(url) as page:
-                        use the page
+           class State(LegislationScraper):
+               def something(self):
+                   with self.urlopen_context(url) as page:
+                       do_stuff(page)
 
         When opening a page like this, if there is any error then the
         page and the URL where this error occurred with be saved and
@@ -206,13 +258,35 @@ class LegislationScraper(object):
     @contextlib.contextmanager
     def soup_context(self, url):
         """
-        Like :meth:`urlopen_context`, except returns a BeautifulSoup
+        Like :method:`urlopen_context`, except returns a BeautifulSoup
         parsed document.
         """
+        if not USE_SOUP:
+            raise ScrapeError("BeautifulSoup does not seem to be installed.")
+
         body = self.urlopen(url)
         soup = BeautifulSoup(body)
+
         try:
             yield soup
+        except:
+            self.show_error(url, body)
+            raise
+
+    @contextlib.contextmanager
+    def lxml_context(self, url):
+        """
+        Like :meth:`urlopen_context`, except returns an lxml parsed
+        document.
+        """
+        if not USE_LXML:
+            raise ScrapeError("lxml does not seem to be installed.")
+
+        body = self.urlopen(url)
+        elem = lxml.html.fromstring(body)
+
+        try:
+            yield elem
         except:
             self.show_error(url, body)
             raise
@@ -236,13 +310,40 @@ class LegislationScraper(object):
 
     def scrape_metadata(self):
         """
-        Grab metadata about this state's legislature.
+        Grab metadata about this state's legislature. Should return a
+        dictionary with at least the following attributes:
+
+        * `state_name`: the full name of this state, e.g. New Hampshire
+        * `legislature name`: the name of this state's legislative body, e.g.
+          `"Texas Legislature"`
+        * `upper_chamber_name`: the name of the upper chamber of this state's
+           legislature, e.g. `"Senate"`
+        * `lower_chamber_name`: the name of the lower chamber of this
+           state's legislature, e.g. `"House of Representatives"`
+        * `upper_title`: the title of a member of this state's upper chamber,
+           e.g. `"Senator"`
+        * `lower_title`: the title of a member of this state's lower chamber,
+           e.g. `"Representative"`
+        * `upper_term`: the length, in years, of a term in this state's
+           upper chamber, e.g. `4`
+        * `lower_term`: the length, in years, of a term in this state's
+           lower chamber, e.g. `2`
+        * `sessions`: an ordered list of available sessions, e.g.
+           `['2005-2006', '2007-2008', '2009-2010']
+        * `session_details`: a dictionary, with an entry for each session
+          indicating the years it encompasses as well as any 'sub' sessions,
+          e.g.::
+
+           {'2009-2010': {'years': [2009, 2010],
+                          'sub_sessions': ["2009 Special Session 1"]}}
+
         """
         return self.metadata
 
     def scrape_legislators(self, chamber, year):
         """
-        Grab all the legislators who served in a given year.
+        Grab all the legislators who served in a given year. Must be
+        overridden by subclasses.
 
         Should raise a :class:`NoDataForYear` exception if the year is invalid.
         """
@@ -250,7 +351,8 @@ class LegislationScraper(object):
 
     def scrape_bills(self, chamber, year):
         """
-        Grab all the bills for a given chamber and year.
+        Grab all the bills for a given chamber and year. Must be
+        overridden by subclasses.
 
         Should raise a :class:`NoDataForYear` exception if the year is invalid.
         """
@@ -258,12 +360,17 @@ class LegislationScraper(object):
                                   'scrape_bills method')
 
     def add_bill(self, bill):
+        warnings.warn("add_bill renamed save_bill", DeprecationWarning)
+        self.save_bill(bill)
+
+    def save_bill(self, bill):
         """
-        Add a scraped :class:`pyutils.legislation.Bill` object.
+        Save a scraped :class:`pyutils.legislation.Bill` object. Only
+        call after all data for the given bill has been collected.
         """
-        self.log("add_bill %s %s: %s" % (bill['chamber'],
-                                         bill['session'],
-                                         bill['bill_id']))
+        self.log("save_bill %s %s: %s" % (bill['chamber'],
+                                          bill['session'],
+                                          bill['bill_id']))
 
         # Associate each recorded vote with an actual legislator
         for vote in bill['votes']:
@@ -283,17 +390,49 @@ class LegislationScraper(object):
 
         bill['state'] = self.state
 
-        filename = "%s:%s:%s.json" % (bill['session'], bill['chamber'],
+        filename = "%s_%s_%s.json" % (bill['session'], bill['chamber'],
                                       bill['bill_id'])
         filename = filename.encode('ascii', 'replace')
         with open(os.path.join(self.output_dir, "bills", filename), 'w') as f:
             json.dump(bill, f, cls=DateEncoder)
 
+    def add_person(self, person):
+        warnings.warn("add_person renamed save_person", DeprecationWarning)
+        self.save_person(person)
+
+    def save_person(self, person):
+        """
+        Save a scraped :class:`pyutils.legislation.Person` object. Only
+        call after all data for the given person has been collected.
+
+        Should be used for non-legislator people (e.g. Governor, Lt. Gov).
+        To add :class:`pyutils.legislation.Legislator` objects call
+        :meth:`pyutils.legislation.save_legislator`.
+        """
+        self.log("save_person: %s" % person['full_name'])
+
+        person['state'] = self.state
+
+        role = person['roles'][0]
+        filename = "%s_%s.json" % (role['session'],
+                                   person['full_name'])
+        filename = filename.encode('ascii', 'replace')
+
+        with open(os.path.join(self.output_dir, "legislators", filename),
+                  'w') as f:
+            json.dump(person, f, cls=DateEncoder)
+
     def add_legislator(self, legislator):
+        warnings.warn("add_legislator renamed save_legislator",
+                      DeprecationWarning)
+        self.save_legislator(legislator)
+
+    def save_legislator(self, legislator):
         """
-        Add a scraped :class:`pyutils.legislation.Legislator` object.
+        Save a scraped :class:`pyutils.legislation.Legislator` object.
+        Only call after all data for the given legislator has been collected.
         """
-        self.log("add_legislator: %s" % legislator['full_name'])
+        self.log("save_legislator: %s" % legislator['full_name'])
 
         role = legislator['roles'][0]
         self.matcher[role['chamber']][legislator] = [
@@ -304,7 +443,7 @@ class LegislationScraper(object):
 
         legislator['state'] = self.state
 
-        filename = "%s:%s:%s:%s.json" % (role['session'],
+        filename = "%s_%s_%s_%s.json" % (role['session'],
                                          role['chamber'],
                                          role['district'],
                                          legislator['full_name'])
@@ -313,12 +452,12 @@ class LegislationScraper(object):
                   'w') as f:
             json.dump(legislator, f, cls=DateEncoder)
 
-    def _add_standalone_vote(self, vote):
+    def _save_standalone_vote(self, vote):
         filename = vote["filename"] + ".json"
-        self.log("_add_standalone_vote %s %s: %s '%s'" % (vote['session'],
-                                                          vote['chamber'],
-                                                          vote['bill_id'],
-                                                          vote['motion']))
+        self.log("_save_standalone_vote %s %s: %s '%s'" % (vote['session'],
+                                                           vote['chamber'],
+                                                           vote['bill_id'],
+                                                           vote['motion']))
 
         for type in ['yes_votes', 'no_votes', 'other_votes']:
             vote[type] = map(lambda l:
@@ -392,8 +531,9 @@ class LegislationScraper(object):
                 scraper.reset_name_matchers(upper=matcher['upper'](),
                                             lower=matcher['lower']())
             try:
-                for chamber in chambers:
-                    scraper.scrape_legislators(chamber, year)
+                if options.legislators:
+                    for chamber in chambers:
+                        scraper.scrape_legislators(chamber, year)
                 for chamber in chambers:
                     scraper.old_bills = {}
                     scraper.scrape_bills(chamber, year)
@@ -414,7 +554,7 @@ class FiftystatesObject(dict):
 
     def add_source(self, url, retrieved=None, **kwargs):
         """
-        Add a source URL from which data related to this vote was scraped.
+        Add a source URL from which data related to this object was scraped.
 
         :param url: the location of the source
         """
@@ -470,11 +610,11 @@ class Bill(FiftystatesObject):
     def add_document(self, name, url, **kwargs):
         """
         Add a document or media item that is related to the bill.  Use this method to add documents such as Fiscal Notes, Analyses, Amendments,  or public hearing recordings.
-
-        If multiple formats of a document are provided, a good rule of thumb is to prefer text, followed by html, followed by pdf/word/etc.
-
         :param name: a name given to the document, e.g. 'Fiscal Note for Amendment LCO 6544'
         :param url: link to location of document or file
+
+
+          If multiple formats of a document are provided, a good rule of thumb is to prefer text, followed by html, followed by pdf/word/etc.
         """
         self['documents'].append(dict(name=name, url=url, **kwargs))
 
@@ -482,11 +622,11 @@ class Bill(FiftystatesObject):
         """
         Add a version of the text of this bill.
 
-        If multiple formats are provided, a good rule of thumb is to
-        prefer text, followed by html, followed by pdf/word/etc.
-        
-        :param name: a name given to this version of the text, e.g. 'As Introduced', 'Version 2', 'As amended', 'Enrolled'
+        :param name: a name given to this version of the text, e.g. 'As Introduced',
+          'Version 2', 'As amended', 'Enrolled'
         :param url: the location of this version on the state's legislative website.
+          If multiple formats are provided, a good rule of thumb is to
+          prefer text, followed by html, followed by pdf/word/etc.
         """
         self['versions'].append(dict(name=name, url=url, **kwargs))
 
@@ -582,30 +722,27 @@ class Vote(FiftystatesObject):
 class Person(FiftystatesObject):
 
     def __init__(self, full_name, **kwargs):
+        """
+        Create a Person.
+
+        Note: the :class:`pyutils.legislation.Legislator` class should
+        be used when dealing with state legislators.
+
+        :param full_name: the person's full name
+        """
         super(Person, self).__init__('person', **kwargs)
         self['full_name'] = full_name
         self['roles'] = []
 
     def add_role(self, role, session, start_date=None, end_date=None, **kwargs):
         """
-        Associate a 'role' with a person. Examples of roles include
-        'Speaker of the House', 'Governor', 'Minority Leader'. When legislators
-        are created they are automatically given a 'Member' role for
-        the chamber they served in.
-        
-        :param session: the session that the role was held in
-            (add_role should be called separately for each session if the role
-            carried across multiple sessions).
-
         If ``start_date`` or ``end_date`` are ``None``, they will default
-        to the start/end date of the given legislative session; otherwise
-        they can be used to 
+        to the start/end date of the given legislative session.
 
-        Examples: ::
+        Examples:
 
-            leg.add_role('Speaker of the House', session='2009',
-                         chamber='lower')
-            leg.add_role('Governor', session='2009')
+        leg.add_role('member', session='2009', chamber='upper',
+                     party='Republican', district='10th')
         """
         self['roles'].append(dict(role=role, session=session,
                                   start_date=start_date,
@@ -640,111 +777,3 @@ class Legislator(Person):
         self['first_name'] = first_name
         self['last_name'] = last_name
         self['middle_name'] = middle_name
-
-
-
-class NameMatcher(object):
-    """
-    Match various forms of a name, provided they uniquely identify
-    a person from everyone else we've seen.
-
-    Given the name object:
-     {'fullname': 'Michael J. Stephens', 'first_name': 'Michael',
-      'last_name': 'Stephens', 'middle_name': 'Joseph'}
-    we will match these forms:
-     Michael J. Stephens
-     Michael Stephens
-     Stephens
-     Stephens, Michael
-     Stephens, M
-     Stephens, Michael Joseph
-     Stephens, Michael J
-     Stephens, M J
-     M Stephens
-     M J Stephens
-     Michael Joseph Stephens
-     Stephens (M)
-
-    Tests:
-
-    >>> nm = NameMatcher()
-    >>> nm[{'fullname': 'Michael J. Stephens', 'first_name': 'Michael', \
-            'last_name': 'Stephens', 'middle_name': 'J'}] = 1
-    >>> assert nm['Michael J. Stephens'] == 1
-    >>> assert nm['Stephens'] == 1
-    >>> assert nm['Michael Stephens'] == 1
-    >>> assert nm['Stephens, M'] == 1
-    >>> assert nm['Stephens, Michael'] == 1
-    >>> assert nm['Stephens, M J'] == 1
-
-    Add a similar name:
-
-    >>> nm[{'fullname': 'Mike J. Stephens', 'first_name': 'Mike', \
-            'last_name': 'Stephens', 'middle_name': 'Joseph'}] = 2
-
-    Unique:
-
-    >>> assert nm['Mike J. Stephens'] == 2
-    >>> assert nm['Mike Stephens'] == 2
-    >>> assert nm['Michael Stephens'] == 1
-
-    Not unique anymore:
-
-    >>> assert nm['Stephens'] == None
-    >>> assert nm['Stephens, M'] == None
-    >>> assert nm['Stephens, M J'] == None
-    """
-
-    def __init__(self):
-        self.names = {}
-
-    def __setitem__(self, name, obj):
-        """
-        Expects a dictionary with fullname, first_name, last_name and
-        middle_name elements as key.
-
-        While this can grow quickly, we should never be dealing with
-        more than a few hundred legislators at a time so don't worry about
-        it.
-        """
-        # We throw possible forms of this name into a set because we
-        # don't want to try to add the same form twice for the same
-        # name
-        forms = set()
-        forms.add(name['full_name'].replace('.', ''))
-        forms.add(name['last_name'])
-        forms.add("%s, %s" % (name['last_name'], name['first_name']))
-        forms.add("%s %s" % (name['first_name'], name['last_name']))
-        forms.add("%s %s" % (name['first_name'][0], name['last_name']))
-        forms.add("%s, %s" % (name['last_name'], name['first_name'][0]))
-        forms.add("%s (%s)" % (name['last_name'], name['first_name']))
-        forms.add("%s (%s)" % (name['last_name'], name['first_name'][0][0]))
-
-        if len(name['middle_name']) > 0:
-            forms.add("%s, %s %s" % (name['last_name'], name['first_name'],
-                                     name['middle_name']))
-            forms.add("%s, %s %s" % (name['last_name'], name['first_name'][0],
-                                     name['middle_name']))
-            forms.add("%s %s %s" % (name['first_name'], name['middle_name'],
-                                    name['last_name']))
-            forms.add("%s, %s %s" % (name['last_name'], name['first_name'][0],
-                                     name['middle_name'][0]))
-            forms.add("%s %s %s" % (name['first_name'], name['middle_name'][0],
-                                    name['last_name']))
-            forms.add("%s, %s %s" % (name['last_name'], name['first_name'],
-                                     name['middle_name'][0]))
-            forms.add("%s, %s.%s." % (name['last_name'], name['first_name'][0],
-                                     name['middle_name'][0]))
-
-        for form in forms:
-            form = form.replace('.', '').lower()
-            if form in self.names:
-                self.names[form] = None
-            else:
-                self.names[form] = obj
-
-    def __getitem__(self, name):
-        name = name.strip().replace('.', '').lower()
-        if name in self.names:
-            return self.names[name]
-        return None
