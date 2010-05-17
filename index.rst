@@ -27,4 +27,3 @@ Links
    Contributing Scrapers <contributing>
    Google Group <http://groups.google.com/group/fifty-state-project>
    Sunlight Labs <http://sunlightlabs.com/>
-   Help us digitize roll call votes in Kentucky <http://transparencycorps.org/campaigns/11>
