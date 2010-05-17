@@ -18,7 +18,7 @@ Requirements
 
 python >= 2.4
 
-simplejson >= 1.8 (will use builtin json module instead on python >= 2.6)
+remoteobjects >= 1.1
 
 Installation
 ============
@@ -30,9 +30,12 @@ To install run
 Usage
 =====
 
+An API key can be obtained at http://services.sunlightlabs.com/.
+
 Grab state metadata:
 
     >>> import fiftystates
+    >>> fiftystates.API_KEY = 'YOUR_API_KEY_HERE'
     >>> ca = fiftystates.State.get('ca')
     >>> print ca.name
     California
